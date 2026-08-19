@@ -1,0 +1,76 @@
+PPSSPP for tur-repo - notes for whoever picks this up
+=====================================================
+
+VERIFIED ON DEVICE (Termux, aarch64, Samsung S24 Ultra, Android 14)
+-------------------------------------------------------------------
+PPSSPP 1.19.x builds, links and runs from source in Termux. Vulkan
+works through Turnip, audio works through PulseAudio, PSP games play.
+
+The shm patch in this folder was applied to a clean checkout, compiled
+with no warnings, and the resulting binary was run. The patch itself
+was produced with git diff, not written by hand.
+
+
+THE SHM PATCH
+-------------
+Bionic has no POSIX shared memory. MemArenaPosix.cpp is compiled
+whenever the bare ANDROID macro is not defined - that macro comes from
+the NDK build system, so a Bionic toolchain that doesn't set it
+compiles this file and then fails to link on shm_open/shm_unlink.
+
+The implementation matches the one already used by qt5-qtbase and
+other packages: real files under @TERMUX_PREFIX@/tmp.
+
+Two things a reviewer may want to comment on:
+
+  * The added <alloca.h> include is not in the qt5-qtbase version.
+    Bionic needs it for alloca().
+
+  * The #ifdef __ANDROID__ guard is arguably redundant, since the
+    whole file already sits inside a !defined(ANDROID) block. Left in
+    for clarity; happy to drop it.
+
+One design note, in case it matters to anyone: PPSSPP uses this
+allocation as the emulated PSP's RAM, ftruncate'd to size and mapped
+MAP_SHARED, so it is written continuously during play. Backing it with
+a file under $PREFIX/tmp puts that traffic on flash. PPSSPP's own
+fallback chain tries /dev/shm before /tmp for exactly this reason. An
+alternative implementation using memfd_create keeps it in memory; it
+was tested and works, but it was not used here because it doesn't match
+the convention other packages follow. Mentioning it only so the choice
+is a conscious one.
+
+
+NOT VERIFIED - PLEASE CHECK
+---------------------------
+The build.sh here is a starting point and has NOT been run through the
+Termux Docker builder. Specifically unchecked:
+
+  * Whether the Termux CMake toolchain sets CMAKE_SYSTEM_NAME=Android.
+    If it does, the bare ANDROID macro is defined, MemArenaPosix.cpp is
+    never compiled, and this patch is unnecessary - PPSSPP would use
+    MemArenaAndroid.cpp instead, which wants ashmem. Worth confirming
+    before anything else, since it changes the whole approach.
+
+  * The on-device build needed several other source edits because
+    Termux's clang defines __ANDROID__ and PPSSPP then takes its
+    Android code paths (EGL/GLES calls, Android Vulkan surface,
+    adrenotools). Those were worked around locally by setting
+    CMAKE_SYSTEM_NAME=Linux and CMAKE_SYSTEM_PROCESSOR=aarch64, which
+    a packaged build may not be able to do. If the package build hits
+    errors about eglGetProcAddress, ANativeWindow, or
+    PFN_vkCreateAndroidSurfaceKHR, that's this.
+
+  * The version pin, dependency list and install paths are best-effort.
+
+  * PPSSPP uses submodules (ffmpeg, glslang, SPIRV-Cross), hence the
+    git+ SRCURL. A release tarball will not work.
+
+
+HOW THE PATCH WAS PRODUCED
+--------------------------
+  1. edit Common/MemArenaPosix.cpp with the @TERMUX_PREFIX@ placeholder
+  2. sed the placeholder to $PREFIX so it compiles
+  3. build and run to confirm
+  4. sed it back to the placeholder
+  5. git diff Common/MemArenaPosix.cpp > shm_open-and-shm_unlink.patch
