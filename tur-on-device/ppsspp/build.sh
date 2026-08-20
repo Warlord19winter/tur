@@ -8,6 +8,8 @@ TERMUX_PKG_SRCURL=git+https://github.com/hrydgard/ppsspp
 TERMUX_PKG_GIT_BRANCH="v${TERMUX_PKG_VERSION}"
 TERMUX_PKG_DEPENDS="ffmpeg, libc++, libpng, libsnappy, libzip, sdl3, sdl3-ttf, zlib"
 TERMUX_PKG_BUILD_DEPENDS="vulkan-headers"
+TERMUX_PKG_DEPENDS="libcurl, libpng, miniupnpc, zlib, libzip, glew, libsnappy, ffmpeg, libcpufeatures, rapidjson, sdl2, sdl2-ttf, fontconfig"
+TERMUX_PKG_BUILD_DEPENDS="mesa-dev, libglvnd-dev, vulkan-headers, rapidjson, spirv-headers, spirv-tools"
 
 # USE_SYSTEM_FFMPEG: the bundled ffmpeg archives are glibc builds and
 #   won't link against Bionic (undefined __isoc99_sscanf, fcntl64).
